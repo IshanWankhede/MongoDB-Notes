@@ -1,0 +1,279 @@
+// Group by maker (list distinct makers)
+
+db.cars.aggregate([
+  {
+    $group: {
+      _id: "$maker"
+    }
+  }
+]);
+
+// Count total cars per maker
+db.cars.aggregate([
+  {
+    $group: {
+      _id: "$maker",
+      Totalcars: { $sum: 1 }
+    }
+  }
+]);
+
+// Average price per maker
+db.cars.aggregate([
+  {
+    $group: {
+      _id: "$maker",
+      AvgPrice: { $avg: "$price" }
+    }
+  }
+]);
+
+// Match Hyundai cars with engine.cc > 1000
+db.cars.aggregate([
+  {
+    $match: {
+      maker: "Hyundai",
+      "engine.cc": { $gt: 1000 }
+    }
+  }
+]);
+
+// Count total Hyundai cars
+db.cars.aggregate([
+  { $match: { maker: "Hyundai" } },
+  { $count: "Total_cars" }
+]);
+
+// Group Hyundai cars by fuel type
+db.cars.aggregate([
+  { $match: { maker: "Hyundai" } },
+  {
+    $group: {
+      _id: "$fuel_type",
+      Totalcars: { $sum: 1 }
+    }
+  }
+]);
+
+// Project only maker, model, and fuel_type for Hyundai cars
+db.cars.aggregate([
+  { $match: { maker: "Hyundai" } },
+  {
+    $project: {
+      maker: 1,
+      model: 1,
+      fuel_type: 1,
+      _id: 0
+    }
+  }
+]);
+
+// Find Hyundai cars, project specific fields, and sort by model
+db.cars.aggregate([
+  { 
+    $match: { maker: "Hyundai" } 
+  },
+  { 
+    $project: { 
+      maker: 1, 
+      model: 1, 
+      fuel_type: 1, 
+      _id: 0 
+    } 
+  },
+  { 
+    $sort: { model: 1 } 
+  }
+]);
+
+db.cars.aggregate([
+    {
+        $group: {
+            _id: "$maker",
+            count: { $sum: 1 }
+        }
+    },
+    {
+        $sort: {
+            count: -1
+        }
+    }
+])
+
+// Unwind the owners array so each owner becomes a separate document
+db.cars.aggregate([
+  { 
+    $unwind: "$owners" 
+  }
+]);
+
+// list down all the hyundia cars and print the name as maker + model 
+
+db.cars.aggregate([
+    {$match : {maker : "Hyundai"}},
+    {$project : {
+        _id:0,
+        CarName:{$concat:["$maker"," ","$model"]}
+    }}
+])
+
+db.cars.aggregate([
+    {$match : {maker : "Hyundai"}},
+    {$project : {
+        _id:0,
+        model:{$toUpper: "$model"}
+    }}
+])
+
+db.cars.aggregate([
+    {$match : {maker : "Hyundai"}},
+    {$project : {
+        _id:0,
+        CarName:{$toUpper : {$concat:["$maker"," ","$model"]}}
+    }}
+])
+
+db.cars.aggregate([
+    {$project: {model:1, _id:0,
+                is_disel:{
+                    $regexMatch:{
+                        input:"$fule_type",
+                        regex:"Dies"
+                    }
+                }}}
+])
+
+// after aggregation store the result in an another collection "Hyundia_cars"
+
+db.cars.aggregate([
+    {$match: {maker:"Hyundai"}},
+    {$project:{_id:0,
+                CarName:{$concat:["$maker"," ","$model"]}}},
+    {$out:"hyndai_cars"}
+])
+
+// Arithimetic operators 
+
+db.cars.aggregate([
+    {$project:{
+        sum:{$add: [1,2,3,4]}
+    }}
+])
+
+db.cars.aggregate([
+    {$project:{
+        _id:0,
+        model:1,
+        new_price:{$add:["$price",55000]}
+    }}
+])
+
+db.cars.aggregate([
+    {$project:{model:1,
+                _id:0,
+                price:1}},
+    {$addFields:{
+        price_in_lakhs:{$divide:["$price",100000]}
+    }}
+])
+
+db.cars.aggregate([
+    {$project:{model:1,
+                _id:0,
+                price:1}},
+    {$addFields:{
+        price_in_lakhs:{
+            $round:[{$divide:["$price",100000]},1]
+        }
+    }}
+])
+
+// calculate total sevice cost of each hyundai car
+
+db.cars.aggregate([
+    {$match:{maker:"Hyundai"}},
+    {$set:{total_service_cost}}
+])
+
+
+db.cars.aggregate([
+  { 
+    $project: {
+      _id: 0, 
+      maker: 1, 
+      model: 1,
+      fuelCategory: {
+        $cond: {
+          if: { $eq: ["$fuel_type", "Petrol"] },
+          then: "Petrol Car",
+          else: "Non-Petrol Car"
+        }
+      }
+    }
+  }
+])
+
+// Categorize cars into Budget, Midrange, Premium based on price
+db.cars.aggregate([
+  { 
+    $project: {
+      _id: 0, 
+      maker: 1, 
+      model: 1,
+      priceCategory: {
+        $switch: {
+          branches: [
+            { 
+              case: { $lt: ["$price", 500000] }, 
+              then: "Budget" 
+            },
+            { 
+              case: { 
+                $and: [
+                  { $gte: ["$price", 500000] }, 
+                  { $lt: ["$price", 1000000] }
+                ] 
+              }, 
+              then: "Midrange" 
+            },
+            { 
+              case: { $gte: ["$price", 1000000] }, 
+              then: "Premium" 
+            }
+          ],
+          default: "Unknown"
+        }
+      }
+    }
+  }
+]);
+
+
+
+db.cars.aggregate([
+  { $match: { maker: "Hyundai" } },   // Step 1: filter only Hyundai cars
+
+  { $set: {                           // Step 2: calculate total service cost
+      total_service_cost: { $sum: "$service_history.cost" }
+    }
+  },
+
+  { $project: {                       // Step 3: select fields to show
+      maker: 1,
+      model: 1,
+      total_service_cost: 1,
+      cost_status: {                  // Step 4: classify cost as High/Low
+        $let: {
+          vars: { totalCost: "$total_service_cost" },
+          in: {
+            $cond: {
+              if: { $gte: ["$$totalCost", 10000] },
+              then: "High",
+              else: "Low"
+            }
+          }
+        }
+      }
+    }
+  }
+]);
